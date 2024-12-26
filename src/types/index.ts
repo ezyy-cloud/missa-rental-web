@@ -23,6 +23,9 @@ export interface Profile {
   is_owner: boolean;
   stripe_customer_id: string | null;
   stripe_account_id: string | null;
+  role: 'user' | 'admin' | null;
+  last_login: string | null;
+  is_suspended: boolean;
 }
 
 export interface Car {
@@ -48,7 +51,11 @@ export interface Car {
   updated_at: string;
   average_rating: number;
   total_reviews: number;
-  status: 'available' | 'unavailable' | 'maintenance';
+  status: 'available' | 'unavailable' | 'maintenance' | 'pending_approval' | 'rejected';
+  approval_status: 'pending' | 'approved' | 'rejected';
+  rejection_reason: string | null;
+  inspection_date: string | null;
+  insurance_expiry: string | null;
   owner?: Profile;
 }
 
@@ -113,4 +120,25 @@ export interface FavoriteCar {
   car_id: string;
   created_at: string;
   car?: Car;
+}
+
+export interface AdminStats {
+  total_users: number;
+  total_cars: number;
+  total_bookings: number;
+  total_revenue: number;
+  new_users_last_month: number;
+  new_cars_last_month: number;
+  new_bookings_last_month: number;
+  revenue_last_month: number;
+}
+
+export interface AdminAction {
+  id: string;
+  admin_id: string;
+  action_type: 'verify_user' | 'suspend_user' | 'approve_car' | 'reject_car' | 'flag_car';
+  target_id: string;
+  reason: string | null;
+  created_at: string;
+  admin?: Profile;
 }

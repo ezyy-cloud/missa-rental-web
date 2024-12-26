@@ -4,6 +4,8 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { useProfileStore } from '../../stores/profileStore';
 import { Camera, Upload } from 'lucide-react';
+import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { useAuthStore } from '../../stores/authStore';
 
 interface IdentityVerificationProps {
   onComplete: () => void;
@@ -11,9 +13,13 @@ interface IdentityVerificationProps {
 
 export default function IdentityVerification({ onComplete }: IdentityVerificationProps) {
   const { profile, updateProfile } = useProfileStore();
+  const { user } = useAuthStore();
+  const supabase = useSupabaseClient();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    id_type: profile?.id_type || '',
+    id_type: profile?.id_type || null,
     id_number: profile?.id_number || '',
     id_expiry_date: profile?.id_expiry_date || '',
     id_country: profile?.id_country || '',
@@ -36,18 +42,90 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
     }
   };
 
+  const uploadFile = async (file: File, type: string): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user?.id}/${type}_${Math.random()}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('identity-documents')
+      .upload(filePath, file);
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('identity-documents')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+    if (!formData.id_type) {
+      setError('Please select an ID type');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
     try {
-      // TODO: Implement file upload to storage
-      // TODO: Call verification service API
+      const uploadPromises: Promise<{ type: string; url: string }>[] = [];
+
+      // Upload ID documents
+      if (files.id_front) {
+        uploadPromises.push(
+          uploadFile(files.id_front, 'id_front').then(url => ({ type: 'id_front_url', url }))
+        );
+      }
+      if (files.id_back) {
+        uploadPromises.push(
+          uploadFile(files.id_back, 'id_back').then(url => ({ type: 'id_back_url', url }))
+        );
+      }
+
+      // Upload driver's license documents
+      if (files.drivers_license_front) {
+        uploadPromises.push(
+          uploadFile(files.drivers_license_front, 'dl_front').then(url => ({ type: 'drivers_license_front_url', url }))
+        );
+      }
+      if (files.drivers_license_back) {
+        uploadPromises.push(
+          uploadFile(files.drivers_license_back, 'dl_back').then(url => ({ type: 'drivers_license_back_url', url }))
+        );
+      }
+
+      // Upload selfie
+      if (files.selfie) {
+        uploadPromises.push(
+          uploadFile(files.selfie, 'selfie').then(url => ({ type: 'selfie_url', url }))
+        );
+      }
+
+      const uploadedFiles = await Promise.all(uploadPromises);
+      
+      const documentUrls = uploadedFiles.reduce((acc, { type, url }) => ({
+        ...acc,
+        [type]: url
+      }), {});
+
       await updateProfile({
         ...formData,
-        verification_status: 'pending' as const,
+        ...documentUrls,
+        verification_status: 'pending',
       });
+
       onComplete();
     } catch (error) {
       console.error('Error submitting verification:', error);
+      setError('Failed to upload documents. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,9 +157,9 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
         <form className="space-y-6">
           <Select
             label="ID Type"
-            value={formData.id_type}
+            value={formData.id_type || ''}
             onChange={(e) =>
-              setFormData((prev) => ({ ...prev, id_type: e.target.value }))
+              setFormData((prev) => ({ ...prev, id_type: e.target.value ? e.target.value as 'passport' | 'national_id' | 'drivers_license' : null }))
             }
             options={[
               { value: 'passport', label: 'Passport' },
@@ -322,6 +400,7 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
               type="button"
               variant="secondary"
               onClick={() => setStep(2)}
+              disabled={loading}
             >
               Back
             </Button>
@@ -329,10 +408,16 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
               type="submit"
               variant="yellow"
               className="flex-1"
+              disabled={loading}
             >
-              Submit Verification
+              {loading ? 'Uploading...' : 'Submit Verification'}
             </Button>
           </div>
+          {error && (
+            <div className="text-red-500 text-sm mt-2">
+              {error}
+            </div>
+          )}
         </form>
       )}
     </div>
