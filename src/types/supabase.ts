@@ -41,29 +41,40 @@ export interface Database {
 
 export interface Profile {
   id: string;
-  created_at: string;
-  updated_at: string;
-  full_name: string | null;
   email: string | null;
+  full_name: string | null;
   avatar_url: string | null;
   phone: string | null;
-  bio: string | null;
-  address: string | null;
-  preferred_contact: 'email' | 'phone' | 'both' | null;
-  verification_status: 'pending' | 'verified' | 'rejected' | null;
-  id_type: 'passport' | 'national_id' | 'drivers_license' | null;
-  id_number: string | null;
-  id_expiry_date: string | null;
-  id_country: string | null;
-  drivers_license_number: string | null;
-  drivers_license_expiry: string | null;
-  drivers_license_country: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_phone: string | null;
-  emergency_contact_relationship: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postal_code: string | null;
+  verification_status: 'pending' | 'verified' | 'rejected';
+  kyc_status: 'pending' | 'verified' | 'rejected';
+  verified_at: string | null;
+  kyc_verified_at: string | null;
   is_owner: boolean;
   stripe_customer_id: string | null;
   stripe_account_id: string | null;
+  created_at: string;
+  updated_at: string;
+  // ID Document URLs
+  id_front_url: string | null;
+  id_back_url: string | null;
+  // Driver's License URLs
+  drivers_license_front_url: string | null;
+  drivers_license_back_url: string | null;
+  drivers_license_country: string | null;
+  // Selfie
+  selfie_url: string | null;
+  // Additional Information
+  additional_info: string | null;
+  // Suspension
+  is_suspended: boolean;
+  suspended_at: string | null;
+  suspension_reason: string | null;
 }
 
 export interface Car {
@@ -71,25 +82,27 @@ export interface Car {
   owner_id: string;
   name: string;
   description: string | null;
-  image: string | null;
+  image: string[] | null;
   price: number;
   location: string;
   make: string;
   model: string;
   year: number;
-  color: string;
-  transmission: 'automatic' | 'manual';
-  fuel_type: 'petrol' | 'diesel' | 'electric' | 'hybrid';
-  seats: number;
-  mileage: number;
-  features: string[];
-  availability_start: string;
-  availability_end: string;
+  color: string | null;
+  transmission: 'automatic' | 'manual' | null;
+  seats: number | null;
+  type: 'Sedan' | 'SUV' | 'Sports Car' | 'Luxury' | 'Electric' | 'Convertible' | 'Van' | 'Truck';
+  status: 'available' | 'maintenance' | 'rented' | 'unavailable';
+  average_rating: number | null;
+  total_reviews: number | null;
   created_at: string;
   updated_at: string;
-  average_rating: number;
-  total_reviews: number;
-  status: 'available' | 'unavailable' | 'maintenance';
+}
+
+export interface ExtendedCar extends Car {
+  owner: Profile;
+  average_rating: number | null;
+  total_reviews: number | null;
 }
 
 export interface Booking {
@@ -122,5 +135,29 @@ export interface Review {
 export interface FavoriteCar {
   user_id: string;
   car_id: string;
+  created_at: string;
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  totalCars: number;
+  totalBookings: number;
+  pendingVerifications: number;
+  activeRentals: number;
+  monthlyRevenue: number;
+  monthlyBookings: number;
+}
+
+export interface AdminAction {
+  id: string;
+  admin_id: string;
+  user_id: string | null;
+  car_id: string | null;
+  booking_id: string | null;
+  action: 'verify_user' | 'reject_user' | 'suspend_user' | 'unsuspend_user' | 
+         'approve_car' | 'reject_car' | 'flag_car' | 
+         'approve_booking' | 'reject_booking' | 'flag_booking';
+  details: string | null;
+  timestamp: string;
   created_at: string;
 }

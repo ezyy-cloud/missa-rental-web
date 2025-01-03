@@ -1,33 +1,25 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import type { Car, FavoriteCar, Booking, Review } from '../types';
+import type { Car, Booking } from '../types';
+import type { CarType } from '../types/car';
 
-interface ExtendedCar extends Car {
-  owner_name?: string;
-  owner_avatar?: string;
-  public_reviews?: Review[];
-}
-
-interface ExtendedReview extends Review {
-  reviewer_name?: string;
-  reviewer_avatar?: string;
-  reviewee_name?: string;
-  reviewee_avatar?: string;
-  car_name?: string;
-  car_image?: string;
+interface ExtendedCar extends Omit<Car, 'type'> {
+  type: CarType;
+  owner_name?: string | null;
+  owner_avatar?: string | null;
 }
 
 interface ExtendedBooking extends Booking {
-  car_name?: string;
-  car_image?: string;
-  renter_name?: string;
-  renter_avatar?: string;
+  car_name?: string | null;
+  car_image?: string | null;
+  renter_name?: string | null;
+  renter_avatar?: string | null;
 }
 
 interface CarState {
   cars: ExtendedCar[];
   userCars: ExtendedCar[];
-  favoriteCars: FavoriteCar[];
+  favoriteCars: any[];
   currentCar: ExtendedCar | null;
   loading: boolean;
   error: string | null;
@@ -42,11 +34,11 @@ interface CarState {
     minSeats?: number;
   };
   userBookings: ExtendedBooking[];
-  userReviews: ExtendedReview[];
+  userReviews: any[];
   fetchCars: () => Promise<void>;
   fetchUserCars: () => Promise<void>;
   fetchCar: (id: string) => Promise<void>;
-  createCar: (data: Partial<Car>) => Promise<void>;
+  createCar: (data: Partial<Car>) => Promise<Car>;
   updateCar: (id: string, data: Partial<Car>) => Promise<void>;
   deleteCar: (id: string) => Promise<void>;
   setSearchParams: (params: CarState['searchParams']) => void;
@@ -75,26 +67,37 @@ export const useCarStore = create<CarState>((set, get) => ({
         .from('cars')
         .select(`
           *,
-          owner:owner_id (
+          owner:profiles!cars_owner_id_fkey (
             id,
             full_name,
             avatar_url
           ),
-          reviews (*)
-        `);
+          reviews (
+            rating
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      const extendedCars: ExtendedCar[] = cars.map(car => ({
-        ...car,
-        owner_name: car.owner?.full_name || null,
-        owner_avatar: car.owner?.avatar_url || null,
-        public_reviews: car.reviews || []
-      }));
-
-      set({ cars: extendedCars, loading: false });
+      const extendedCars: ExtendedCar[] = (cars || []).map(car => {
+        const owner = Array.isArray(car.owner) ? car.owner[0] : car.owner;
+        return {
+          ...car,
+          owner_name: owner?.full_name || null,
+          owner_avatar: owner?.avatar_url || null,
+          rating: car.reviews?.reduce((acc: number, review: { rating: number }) => acc + review.rating, 0) / (car.reviews?.length || 1) || null,
+          make: car.make || '',
+          model: car.model || '',
+          year: car.year || new Date().getFullYear(),
+          approval_status: car.approval_status || 'pending',
+          updated_at: car.updated_at || car.created_at
+        };
+      });
+      set({ cars: extendedCars, loading: false, error: null });
     } catch (error) {
-      console.error('Error fetching cars:', error);
       set({ error: 'Failed to fetch cars', loading: false });
     }
   },
@@ -109,7 +112,7 @@ export const useCarStore = create<CarState>((set, get) => ({
         .from('cars')
         .select(`
           *,
-          owner:profiles (
+          owner:profiles!cars_owner_id_fkey (
             id,
             full_name,
             avatar_url
@@ -120,16 +123,17 @@ export const useCarStore = create<CarState>((set, get) => ({
 
       if (error) throw error;
 
-      const extendedCars: ExtendedCar[] = cars.map(car => ({
-        ...car,
-        owner_name: car.owner?.full_name || null,
-        owner_avatar: car.owner?.avatar_url || null,
-        public_reviews: car.reviews || []
-      }));
+      const extendedCars: ExtendedCar[] = cars.map(car => {
+        const owner = Array.isArray(car.owner) ? car.owner[0] : car.owner;
+        return {
+          ...car,
+          owner_name: owner?.full_name || null,
+          owner_avatar: owner?.avatar_url || null,
+        };
+      });
 
       set({ userCars: extendedCars, loading: false });
     } catch (error) {
-      console.error('Error fetching user cars:', error);
       set({ error: 'Failed to fetch your cars', loading: false });
     }
   },
@@ -141,7 +145,7 @@ export const useCarStore = create<CarState>((set, get) => ({
         .from('cars')
         .select(`
           *,
-          owner:profiles (
+          owner:profiles!cars_owner_id_fkey (
             id,
             full_name,
             avatar_url
@@ -153,54 +157,60 @@ export const useCarStore = create<CarState>((set, get) => ({
 
       if (error) throw error;
 
+      const owner = Array.isArray(car.owner) ? car.owner[0] : car.owner;
       const extendedCar: ExtendedCar = {
         ...car,
-        owner_name: car.owner?.full_name || null,
-        owner_avatar: car.owner?.avatar_url || null,
-        public_reviews: car.reviews || []
+        owner_name: owner?.full_name || null,
+        owner_avatar: owner?.avatar_url || null,
       };
 
       set({ currentCar: extendedCar, loading: false });
     } catch (error) {
-      console.error('Error fetching car:', error);
-      set({ error: 'Failed to fetch car', loading: false });
+      set({ error: 'Failed to fetch car details', loading: false });
     }
   },
 
-  createCar: async (data: Partial<Car>) => {
-    set({ loading: true, error: null });
+  createCar: async (carData: Partial<Car>) => {
+    set({ loading: true });
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('No user logged in');
-
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.user.id)
-        .single();
-
-      if (profileError) throw profileError;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
 
       const { data: car, error } = await supabase
         .from('cars')
-        .insert({ ...data, owner_id: user.user.id })
-        .select()
+        .insert({
+          ...carData,
+          owner_id: user.id,
+        })
+        .select(`
+          *,
+          owner:profiles!cars_owner_id_fkey (
+            id,
+            full_name,
+            avatar_url
+          )
+        `)
         .single();
 
       if (error) throw error;
 
+      const owner = Array.isArray(car.owner) ? car.owner[0] : car.owner;
       const extendedCar: ExtendedCar = {
         ...car,
-        owner_name: profile.full_name || null,
-        owner_avatar: profile.avatar_url || null,
-        public_reviews: []
+        owner_name: owner?.full_name || null,
+        owner_avatar: owner?.avatar_url || null,
       };
 
-      const userCars = [...get().userCars, extendedCar];
-      set({ userCars, loading: false });
+      set((state) => ({
+        cars: [...state.cars, extendedCar],
+        userCars: [...state.userCars, extendedCar],
+        loading: false
+      }));
+
+      return car;
     } catch (error) {
-      console.error('Error creating car:', error);
-      set({ error: 'Failed to create car', loading: false });
+      set({ error: 'Failed to create car listing', loading: false });
+      throw error;
     }
   },
 
@@ -216,11 +226,11 @@ export const useCarStore = create<CarState>((set, get) => ({
 
       if (error) throw error;
 
+      const owner = Array.isArray(car.owner) ? car.owner[0] : car.owner;
       const extendedCar: ExtendedCar = {
         ...car,
-        owner_name: car.owner?.full_name || null,
-        owner_avatar: car.owner?.avatar_url || null,
-        public_reviews: car.reviews || []
+        owner_name: owner?.full_name || null,
+        owner_avatar: owner?.avatar_url || null,
       };
 
       const userCars = get().userCars.map(c =>
@@ -232,7 +242,6 @@ export const useCarStore = create<CarState>((set, get) => ({
         set({ currentCar: extendedCar });
       }
     } catch (error) {
-      console.error('Error updating car:', error);
       set({ error: 'Failed to update car', loading: false });
     }
   },
@@ -250,7 +259,6 @@ export const useCarStore = create<CarState>((set, get) => ({
       const userCars = get().userCars.filter(c => c.id !== id);
       set({ userCars, loading: false });
     } catch (error) {
-      console.error('Error deleting car:', error);
       set({ error: 'Failed to delete car', loading: false });
     }
   },
@@ -312,7 +320,6 @@ export const useCarStore = create<CarState>((set, get) => ({
         set({ favoriteCars });
       }
     } catch (error) {
-      console.error('Error toggling favorite:', error);
       set({ error: 'Failed to toggle favorite' });
     }
   },
@@ -329,23 +336,20 @@ export const useCarStore = create<CarState>((set, get) => ({
         .eq('user_id', user.user.id);
 
       if (error) {
-        console.error('Supabase error:', error);
         throw error;
       }
 
-      const extendedFavorites: FavoriteCar[] = favorites.map(favorite => ({
+      const extendedFavorites = favorites.map(favorite => ({
         ...favorite,
         car: {
           ...favorite.car,
           owner_name: favorite.car.owner?.full_name || null,
           owner_avatar: favorite.car.owner?.avatar_url || null,
-          public_reviews: favorite.car.reviews || []
         }
       }));
 
       set({ favoriteCars: extendedFavorites, loading: false });
     } catch (error) {
-      console.error('Error fetching favorites:', error);
       set({ error: 'Failed to fetch favorites', loading: false });
     }
   },
@@ -357,14 +361,15 @@ export const useCarStore = create<CarState>((set, get) => ({
         .select('*')
         .eq('car_id', carId)
         .eq('status', 'confirmed')
-        .or(`start_date.lte.${endDate},end_date.gte.${startDate}`);
+        .or(`and(start_date.lte.${endDate},end_date.gte.${startDate})`);
 
       if (error) {
-        console.error('Supabase error:', error);
         throw error;
       }
+      
+      // Car is available if there are no overlapping bookings
       return bookings.length === 0;
-    } catch {
+    } catch (error) {
       return false;
     }
   },
@@ -381,12 +386,10 @@ export const useCarStore = create<CarState>((set, get) => ({
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase error:', error);
         throw error;
       }
       set({ userBookings: bookings });
     } catch (error) {
-      console.error('Error fetching user bookings:', error);
       throw error;
     }
   },
@@ -403,12 +406,10 @@ export const useCarStore = create<CarState>((set, get) => ({
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Supabase error:', error);
         throw error;
       }
       set({ userReviews: reviews });
     } catch (error) {
-      console.error('Error fetching user reviews:', error);
       throw error;
     }
   },

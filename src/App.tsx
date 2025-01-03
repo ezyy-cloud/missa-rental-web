@@ -1,24 +1,20 @@
-import { useRoutes } from 'react-router-dom';
-import { useThemeStore } from './stores/themeStore';
-import Navbar from './components/Navbar';
-import { routes } from './routes';
-import { adminRoutes } from './routes/admin';
+import { useEffect } from 'react';
+import { RouterProvider } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { useAuthStore } from './stores/auth';
+import { router } from './routes';
 
-function App() {
-  const { theme } = useThemeStore();
+export default function App() {
+  const initialize = useAuthStore((state) => state.initialize);
 
   useEffect(() => {
-    document.documentElement.className = theme;
-  }, [theme]);
-
-  const routing = useRoutes([...routes, ...adminRoutes]);
+    initialize();
+  }, [initialize]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <Navbar />
-      {routing}
-    </div>
+    <>
+      <RouterProvider router={router} />
+      <Toaster position="top-right" />
+    </>
   );
 }
-
-export default App;

@@ -13,6 +13,10 @@ export default {
         secondary: {
           DEFAULT: '#1A1A1A',
           light: '#2D2D2D'
+        },
+        dark: {
+          DEFAULT: '#000000',
+          lighter: '#1A1A1A'
         }
       }
     },

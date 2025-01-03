@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Car } from '../types';
+import type { Car } from '@/types/car';
 
 export async function createCar(carData: Omit<Car, 'id' | 'owner_id'>) {
   const { data, error } = await supabase
@@ -39,7 +39,11 @@ export async function deleteCar(id: string) {
 export async function getCar(id: string) {
   const { data, error } = await supabase
     .from('cars')
-    .select('*, bookings(*)')
+    .select(`
+      *,
+      owner_profile:profiles!cars_owner_id_fkey(*),
+      bookings(*)
+    `)
     .eq('id', id)
     .single();
 
@@ -50,7 +54,10 @@ export async function getCar(id: string) {
 export async function getUserCars() {
   const { data, error } = await supabase
     .from('cars')
-    .select('*')
+    .select(`
+      *,
+      owner_profile:profiles!cars_owner_id_fkey(*)
+    `)
     .eq('owner_id', (await supabase.auth.getUser()).data.user?.id);
 
   if (error) throw error;
@@ -59,54 +66,60 @@ export async function getUserCars() {
 
 export async function searchCars(params: {
   location?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  make?: string;
   startDate?: string;
   endDate?: string;
+  make?: string;
+  model?: string;
+  minPrice?: number;
+  maxPrice?: number;
 }) {
-  let query = supabase.from('cars').select('*');
+  let query = supabase
+    .from('cars')
+    .select(`
+      *,
+      owner_profile:profiles!cars_owner_id_fkey(*)
+    `)
+    .eq('approval_status', 'approved');
 
   if (params.location) {
     query = query.ilike('location', `%${params.location}%`);
-  }
-
-  if (params.minPrice) {
-    query = query.gte('price', params.minPrice);
-  }
-
-  if (params.maxPrice) {
-    query = query.lte('price', params.maxPrice);
   }
 
   if (params.make) {
     query = query.ilike('make', `%${params.make}%`);
   }
 
+  if (params.model) {
+    query = query.ilike('model', `%${params.model}%`);
+  }
+
+  if (params.minPrice !== undefined) {
+    query = query.gte('price', params.minPrice);
+  }
+
+  if (params.maxPrice !== undefined) {
+    query = query.lte('price', params.maxPrice);
+  }
+
   const { data, error } = await query;
 
   if (error) throw error;
 
-  // Filter out cars that are booked for the requested dates
+  // Filter by date availability if dates are provided
   if (params.startDate && params.endDate) {
     const availableCars = await Promise.all(
       data.map(async (car) => {
-        const isAvailable = await checkCarAvailability(
-          car.id,
-          params.startDate!,
-          params.endDate!
-        );
+        const isAvailable = await checkCarAvailability(car.id, params.startDate!, params.endDate!);
         return isAvailable ? car : null;
       })
     );
-
-    return availableCars.filter(Boolean);
+    return availableCars.filter((car): car is Car => car !== null);
   }
 
   return data;
 }
 
-async function checkCarAvailability(
+export async function checkCarAvailability(
   carId: string,
   startDate: string,
   endDate: string
@@ -116,7 +129,7 @@ async function checkCarAvailability(
     .select('*')
     .eq('car_id', carId)
     .eq('status', 'confirmed')
-    .or(`start_date,overlaps,[${startDate},${endDate}]`);
+    .or(`start_date.lte.${endDate},end_date.gte.${startDate}`);
 
   if (error) throw error;
   return bookings.length === 0;

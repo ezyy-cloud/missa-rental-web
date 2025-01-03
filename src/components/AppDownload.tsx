@@ -1,5 +1,7 @@
-import React from 'react';
 import { Phone, Shield, Clock } from 'lucide-react';
+import { Button } from './ui/Button';
+import { PhonePreview } from './icons/PhonePreview';
+import { AppleLogo, GooglePlayLogo } from './icons/StoreLogos';
 
 export default function AppDownload() {
   return (
@@ -40,37 +42,27 @@ export default function AppDownload() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4">
-              <a
-                href="#"
-                className="flex items-center justify-center bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-900 transition-colors"
-              >
-                <img
-                  src="/app-store.svg"
-                  alt="Download on the App Store"
-                  className="h-8"
-                />
-              </a>
-              <a
-                href="#"
-                className="flex items-center justify-center bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-900 transition-colors"
-              >
-                <img
-                  src="/play-store.svg"
-                  alt="Get it on Google Play"
-                  className="h-8"
-                />
-              </a>
+            <div className="flex flex-col sm:flex-row gap-4 justify-start">
+              <Button variant="outline" size="lg" className="flex items-center gap-3 dark:hover:text-white min-w-[220px]">
+                <AppleLogo className="w-7 h-7" />
+                <div className="text-left">
+                  <div className="text-xs opacity-80">Download on the</div>
+                  <div className="text-base font-semibold -mt-0.5">App Store</div>
+                </div>
+              </Button>
+              <Button variant="outline" size="lg" className="flex items-center gap-3 dark:hover:text-white min-w-[220px]">
+                <GooglePlayLogo className="w-7 h-7" />
+                <div className="text-left">
+                  <div className="text-xs opacity-80">Get it on</div>
+                  <div className="text-base font-semibold -mt-0.5">Google Play</div>
+                </div>
+              </Button>
             </div>
           </div>
 
-          <div className="relative">
-            <img
-              src="/app-preview.png"
-              alt="MissaRental Mobile App"
-              className="w-full max-w-md mx-auto lg:max-w-none rounded-2xl shadow-2xl"
-            />
-            <div className="absolute -top-4 -right-4 bg-white text-primary px-6 py-2 rounded-full font-semibold shadow-lg">
+          <div className="relative w-24 md:w-32 lg:w-40 mx-auto">
+            <PhonePreview className="w-full h-auto" />
+            <div className="absolute -top-2 -right-2 bg-white dark:bg-black px-2 py-1 rounded-full font-semibold shadow-lg text-yellow-500 text-xs">
               4.9 ★ on App Store
             </div>
           </div>

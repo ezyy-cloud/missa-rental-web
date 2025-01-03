@@ -10,7 +10,7 @@ export default function FeaturedCars() {
   }, [fetchCars]);
 
   return (
-    <section className="py-12 bg-gray-50 dark:bg-gray-800">
+    <section className="py-12 bg-gray-50 dark:bg-black border-t border-gray-200 dark:border-white/10">
       <div className="max-w-7xl mx-auto px-4">
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">Featured Cars</h2>
         {loading ? (

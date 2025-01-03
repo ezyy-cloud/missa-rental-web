@@ -1,7 +1,7 @@
 import { Star, Award, Crown, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from './ui/Button';
-import { useAuthStore } from '../stores/authStore';
+import { useAuthStore } from '@/stores/auth';
 
 const REWARDS_TIERS = [
   {
@@ -56,14 +56,14 @@ export default function RewardsSection() {
   const { user } = useAuthStore();
 
   return (
-    <section className="py-16 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800">
+    <section className="py-16 bg-gray-50 dark:bg-black border-t border-gray-200 dark:border-white/10">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-4 text-gray-900 dark:text-white">
             Earn More as a Top Host
           </h2>
           <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Join our rewards program and unlock exclusive benefits. The more you host, 
+            Join our rewards program and unlock exclusive benefits. The more you host,
             the more you earn. Climb the ranks and become an Elite Host!
           </p>
         </div>
@@ -72,19 +72,19 @@ export default function RewardsSection() {
           {REWARDS_TIERS.map((tier) => (
             <div
               key={tier.name}
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl transition-shadow p-6"
+              className="bg-white dark:bg-dark-lighter rounded-xl shadow-md hover:shadow-xl transition-shadow p-6"
             >
               <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 dark:bg-primary/20 mb-4">
                 <tier.icon className="w-6 h-6 text-primary" />
               </div>
-              
+
               <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
                 {tier.name}
               </h3>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
                 {tier.requirements}
               </p>
-              
+
               <div className="space-y-2">
                 {tier.benefits.map((benefit, index) => (
                   <div key={index} className="flex items-start gap-2">
@@ -97,20 +97,26 @@ export default function RewardsSection() {
           ))}
         </div>
 
-        <div className="text-center mt-12">
-          <Link to={user ? "/list-car" : "/signup"}>
-            <Button variant="yellow" size="lg">
-              {user ? "Start Hosting Today" : "Sign Up to Start Hosting"}
-            </Button>
-          </Link>
-          {!user && (
-            <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
-              Already have an account?{' '}
-              <Link to="/signin" className="text-primary hover:text-primary-dark">
-                Sign in
+        <div className="flex justify-center mt-8">
+          {!user ? (
+            <div className="text-center ">
+              <Link to="/sign-up">
+                <Button variant="yellow" size="lg">Start Earning Today</Button>
               </Link>
-              {' '}to start listing your cars
-            </p>
+              <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+                Already have an account?{' '}
+                <Link to="/sign-in" className="text-primary hover:text-primary-dark">
+                  Sign in
+                </Link>
+                {' '}to start listing your cars
+              </p>
+            </div>
+          ) : (
+            <div>
+              <Link to="/list-car">
+                <Button variant="yellow" size="lg">List Your First Car</Button>
+              </Link>
+            </div>
           )}
         </div>
       </div>

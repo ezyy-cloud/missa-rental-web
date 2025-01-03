@@ -47,7 +47,7 @@ export function BookingChat({ bookingId, recipientId }: BookingChatProps) {
   };
 
   return (
-    <div className="flex flex-col h-[500px] bg-white dark:bg-gray-800 rounded-lg shadow-md">
+    <div className="flex flex-col h-[500px] bg-white dark:bg-black rounded-lg shadow-md">
       {/* Chat Header */}
       <div className="p-4 border-b dark:border-gray-700">
         <h3 className="text-lg font-semibold">Booking Chat</h3>
@@ -70,7 +70,7 @@ export function BookingChat({ bookingId, recipientId }: BookingChatProps) {
               className={`max-w-[70%] rounded-lg p-3 ${
                 msg.sender_id === profile?.id
                   ? 'bg-primary text-white'
-                  : 'bg-gray-100 dark:bg-gray-700'
+                  : 'bg-gray-100 dark:bg-black'
               }`}
             >
               <p className="text-sm">{msg.content}</p>

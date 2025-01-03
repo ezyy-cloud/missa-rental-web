@@ -5,7 +5,7 @@ const TESTIMONIALS = [
     id: 1,
     name: 'Sarah Johnson',
     role: 'Renter',
-    image: '/testimonials/sarah.jpg',
+    image: `https://ui-avatars.com/api/?name=Sarah+Johnson&background=random`,
     text: 'MissaRental made my vacation perfect! The Tesla Model 3 I rented was immaculate, and the host was incredibly helpful. The whole process was smooth and hassle-free.',
     rating: 5,
   },
@@ -13,7 +13,7 @@ const TESTIMONIALS = [
     id: 2,
     name: 'Michael Chen',
     role: 'Car Owner',
-    image: '/testimonials/michael.jpg',
+    image: `https://ui-avatars.com/api/?name=Michael+Chen&background=random`,
     text: 'As a car owner, I have earned over $2,000/month sharing my BMW on MissaRental. The platform handles everything - insurance, payments, and screening. It has been amazing!',
     rating: 5,
   },
@@ -21,7 +21,7 @@ const TESTIMONIALS = [
     id: 3,
     name: 'Emily Rodriguez',
     role: 'Renter',
-    image: '/testimonials/emily.jpg',
+    image: `https://ui-avatars.com/api/?name=Emily+Rodriguez&background=random`,
     text: 'Found the perfect car for my wedding day! The app made it easy to filter by style and color. The host even added special decorations. Unforgettable experience!',
     rating: 5,
   },
@@ -29,7 +29,7 @@ const TESTIMONIALS = [
 
 export default function Testimonials() {
   return (
-    <section className="py-16 bg-gray-50 dark:bg-gray-900">
+    <section className="py-16 bg-gray-50 dark:bg-black border-t border-gray-200 dark:border-white/10">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold mb-2 text-gray-900 dark:text-white">
@@ -44,7 +44,7 @@ export default function Testimonials() {
           {TESTIMONIALS.map((testimonial) => (
             <div
               key={testimonial.id}
-              className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow"
+              className="bg-white dark:bg-dark-lighter p-6 rounded-xl shadow-md hover:shadow-xl transition-shadow"
             >
               <div className="flex items-center mb-4">
                 <img

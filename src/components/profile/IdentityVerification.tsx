@@ -1,4 +1,4 @@
-import React, { useState, ChangeEvent } from 'react';
+import { useState, ChangeEvent, FormEvent } from 'react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
@@ -6,6 +6,22 @@ import { useProfileStore } from '../../stores/profileStore';
 import { Camera, Upload } from 'lucide-react';
 import { useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useAuthStore } from '../../stores/authStore';
+
+interface Profile {
+  id_type: string | null;
+  id_number: string;
+  id_expiry_date: string;
+  id_country: string;
+  drivers_license_number: string;
+  drivers_license_expiry: string;
+  drivers_license_country: string;
+  id_front_url: string | null;
+  id_back_url: string | null;
+  drivers_license_front_url: string | null;
+  drivers_license_back_url: string | null;
+  selfie_url: string | null;
+  verification_status: string;
+}
 
 interface IdentityVerificationProps {
   onComplete: () => void;
@@ -18,14 +34,15 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    id_type: profile?.id_type || null,
+  const [formData, setFormData] = useState<Partial<Profile>>({
+    id_type: profile?.id_type || undefined,
     id_number: profile?.id_number || '',
     id_expiry_date: profile?.id_expiry_date || '',
     id_country: profile?.id_country || '',
     drivers_license_number: profile?.drivers_license_number || '',
     drivers_license_expiry: profile?.drivers_license_expiry || '',
     drivers_license_country: profile?.drivers_license_country || '',
+    verification_status: 'pending'
   });
   const [files, setFiles] = useState<{
     id_front?: File;
@@ -62,7 +79,7 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
     return publicUrl;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!user) return;
     if (!formData.id_type) {
@@ -116,9 +133,10 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
 
       await updateProfile({
         ...formData,
+        id_type: formData.id_type || undefined,
         ...documentUrls,
         verification_status: 'pending',
-      });
+      } );
 
       onComplete();
     } catch (error) {
@@ -158,21 +176,23 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
           <Select
             label="ID Type"
             value={formData.id_type || ''}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, id_type: e.target.value ? e.target.value as 'passport' | 'national_id' | 'drivers_license' : null }))
+            onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+              setFormData(prev => ({ ...prev, id_type: e.target.value === '' ? undefined : e.target.value as 'passport' | 'national_id' | 'drivers_license' | 'residence_permit' }))
             }
             options={[
+              { value: '', label: 'Select ID Type' },
               { value: 'passport', label: 'Passport' },
               { value: 'national_id', label: 'National ID' },
-              { value: 'drivers_license', label: 'Driver\'s License' },
+              { value: 'drivers_license', label: "Driver's License" },
+              { value: 'residence_permit', label: 'Residence Permit' },
             ]}
             required
           />
           <Input
             label="ID Number"
             value={formData.id_number}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, id_number: e.target.value }))
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFormData(prev => ({ ...prev, id_number: e.target.value }))
             }
             required
           />
@@ -180,16 +200,16 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
             type="date"
             label="ID Expiry Date"
             value={formData.id_expiry_date}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, id_expiry_date: e.target.value }))
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFormData(prev => ({ ...prev, id_expiry_date: e.target.value }))
             }
             required
           />
           <Input
             label="ID Issuing Country"
             value={formData.id_country}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, id_country: e.target.value }))
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFormData(prev => ({ ...prev, id_country: e.target.value }))
             }
             required
           />
@@ -209,11 +229,8 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
           <Input
             label="Driver's License Number"
             value={formData.drivers_license_number}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                drivers_license_number: e.target.value,
-              }))
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFormData(prev => ({ ...prev, drivers_license_number: e.target.value }))
             }
             required
           />
@@ -221,22 +238,16 @@ export default function IdentityVerification({ onComplete }: IdentityVerificatio
             type="date"
             label="Driver's License Expiry"
             value={formData.drivers_license_expiry}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                drivers_license_expiry: e.target.value,
-              }))
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFormData(prev => ({ ...prev, drivers_license_expiry: e.target.value }))
             }
             required
           />
           <Input
             label="Driver's License Country"
             value={formData.drivers_license_country}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                drivers_license_country: e.target.value,
-              }))
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setFormData(prev => ({ ...prev, drivers_license_country: e.target.value }))
             }
             required
           />

@@ -6,12 +6,9 @@ interface CardProps {
   children: React.ReactNode;
 }
 
-export function Card({ className, children }: CardProps) {
+export function Card({ className, children, ...props }: CardProps) {
   return (
-    <div className={cn(
-      "bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow border border-gray-200 dark:border-gray-700",
-      className
-    )}>
+    <div className={cn("bg-white dark:bg-dark-lighter rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow border border-gray-200 dark:border-gray-700", className)} {...props}>
       {children}
     </div>
   );

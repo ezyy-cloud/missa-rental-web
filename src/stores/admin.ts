@@ -21,6 +21,7 @@ interface AdminStore {
     require_car_insurance: boolean;
     auto_approve_verified_owners: boolean;
   } | null;
+  currentAdmin: Profile | null;
   loading: boolean;
   error: string | null;
   fetchStats: () => Promise<void>;
@@ -30,13 +31,16 @@ interface AdminStore {
   fetchSettings: () => Promise<void>;
   updateSettings: (settings: AdminStore['settings']) => Promise<void>;
   verifyUser: (userId: string) => Promise<void>;
+  rejectUser: (userId: string, reason: string) => Promise<void>;
   suspendUser: (userId: string, reason: string) => Promise<void>;
+  unsuspendUser: (userId: string) => Promise<void>;
   approveCar: (carId: string) => Promise<void>;
   rejectCar: (carId: string, reason: string) => Promise<void>;
   flagCar: (carId: string, reason: string) => Promise<void>;
   approveBooking: (bookingId: string) => Promise<void>;
   rejectBooking: (bookingId: string, reason: string) => Promise<void>;
   flagBooking: (bookingId: string, reason: string) => Promise<void>;
+  initializeAdmin: () => Promise<void>;
 }
 
 export const useAdminStore = create<AdminStore>((set, get) => ({
@@ -46,8 +50,33 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
   pendingBookings: [],
   recentActions: [],
   settings: null,
+  currentAdmin: null,
   loading: false,
   error: null,
+
+  initializeAdmin: async () => {
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      
+      if (user) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (profileError) throw profileError;
+        
+        if (profile && profile.role === 'admin') {
+          set({ currentAdmin: profile });
+        }
+      }
+    } catch (error) {
+      console.error('Error initializing admin:', error);
+      set({ error: 'Failed to initialize admin' });
+    }
+  },
 
   fetchStats: async () => {
     try {
@@ -85,6 +114,7 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
       });
     } catch (error) {
       set({ error: 'Failed to fetch stats', loading: false });
+      console.error('Error fetching stats:', error);
     }
   },
 
@@ -102,6 +132,7 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
       set({ pendingUsers: data || [], loading: false });
     } catch (error) {
       set({ error: 'Failed to fetch pending users', loading: false });
+      console.error('Error fetching pending users:', error);
     }
   },
 
@@ -119,6 +150,7 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
       set({ pendingCars: data || [], loading: false });
     } catch (error) {
       set({ error: 'Failed to fetch pending cars', loading: false });
+      console.error('Error fetching pending cars:', error);
     }
   },
 
@@ -136,24 +168,7 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
       set({ pendingBookings: data || [], loading: false });
     } catch (error) {
       set({ error: 'Failed to fetch pending bookings', loading: false });
-    }
-  },
-
-  fetchRecentActions: async () => {
-    try {
-      set({ loading: true, error: null });
-      
-      const { data, error } = await supabase
-        .from('admin_actions')
-        .select('*, admin:profiles(*)')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-
-      set({ recentActions: data || [], loading: false });
-    } catch (error) {
-      set({ error: 'Failed to fetch recent actions', loading: false });
+      console.error('Error fetching pending bookings:', error);
     }
   },
 
@@ -171,6 +186,7 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
       set({ settings: data, loading: false });
     } catch (error) {
       set({ error: 'Failed to fetch settings', loading: false });
+      console.error('Error fetching settings:', error);
     }
   },
 
@@ -187,216 +203,325 @@ export const useAdminStore = create<AdminStore>((set, get) => ({
       set({ settings, loading: false });
     } catch (error) {
       set({ error: 'Failed to update settings', loading: false });
+      console.error('Error updating settings:', error);
     }
   },
 
   verifyUser: async (userId: string) => {
     try {
-      set({ loading: true, error: null });
-      
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('profiles')
-        .update({ verification_status: 'verified' })
+        .update({
+          kyc_status: 'verified',
+          kyc_verified_at: new Date().toISOString()
+        })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+    } catch (error) {
+      console.error('Error verifying user:', error);
+      throw error;
+    }
+  },
 
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: 'verify_user',
-        target_id: userId,
+  rejectUser: async (userId: string, reason: string) => {
+    try {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          verification_status: 'rejected',
+          is_suspended: false,
+          suspension_reason: reason,
+          suspended_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      // Log the admin action
+      const { error: logError } = await supabase.from('admin_actions').insert({
+        admin_id: get().currentAdmin?.id,
+        user_id: userId,
+        action: 'reject_user',
+        reason,
+        timestamp: new Date().toISOString(),
       });
 
-      await get().fetchPendingUsers();
-      await get().fetchRecentActions();
-      set({ loading: false });
+      if (logError) throw logError;
     } catch (error) {
-      set({ error: 'Failed to verify user', loading: false });
+      console.error('Error rejecting user:', error);
+      throw error;
     }
   },
 
   suspendUser: async (userId: string, reason: string) => {
     try {
-      set({ loading: true, error: null });
-      
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('profiles')
-        .update({ is_suspended: true })
+        .update({
+          is_suspended: true,
+          suspension_reason: reason,
+          suspended_at: new Date().toISOString(),
+        })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: 'suspend_user',
-        target_id: userId,
+      // Log the admin action
+      const { error: logError } = await supabase.from('admin_actions').insert({
+        admin_id: get().currentAdmin?.id,
+        user_id: userId,
+        action: 'suspend_user',
         reason,
+        timestamp: new Date().toISOString(),
       });
 
-      await get().fetchPendingUsers();
-      await get().fetchRecentActions();
-      set({ loading: false });
+      if (logError) throw logError;
     } catch (error) {
-      set({ error: 'Failed to suspend user', loading: false });
+      console.error('Error suspending user:', error);
+      throw error;
+    }
+  },
+
+  unsuspendUser: async (userId: string) => {
+    try {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          is_suspended: false,
+          suspension_reason: null,
+          suspended_at: null,
+        })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      // Log the admin action
+      const { error: logError } = await supabase.from('admin_actions').insert({
+        admin_id: get().currentAdmin?.id,
+        user_id: userId,
+        action: 'unsuspend_user',
+        timestamp: new Date().toISOString(),
+      });
+
+      if (logError) throw logError;
+    } catch (error) {
+      console.error('Error unsuspending user:', error);
+      throw error;
     }
   },
 
   approveCar: async (carId: string) => {
     try {
       set({ loading: true, error: null });
-      
-      const { error } = await supabase
+
+      const { error: approvalError } = await supabase
         .from('cars')
-        .update({ approval_status: 'approved', status: 'available' })
+        .update({ 
+          approval_status: 'approved',
+          approved_at: new Date().toISOString()
+        })
         .eq('id', carId);
 
-      if (error) throw error;
+      if (approvalError) throw approvalError;
 
       // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: 'approve_car',
-        target_id: carId,
-      });
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          action_type: 'approve_car',
+          target_id: carId,
+          target_type: 'car',
+          admin_id: (await supabase.auth.getUser()).data.user?.id
+        });
 
+      if (actionError) throw actionError;
+
+      // Refresh pending cars
       await get().fetchPendingCars();
-      await get().fetchRecentActions();
       set({ loading: false });
     } catch (error) {
       set({ error: 'Failed to approve car', loading: false });
+      console.error('Error approving car:', error);
     }
   },
 
   rejectCar: async (carId: string, reason: string) => {
     try {
       set({ loading: true, error: null });
-      
-      const { error } = await supabase
+
+      const { error: rejectionError } = await supabase
         .from('cars')
-        .update({
+        .update({ 
           approval_status: 'rejected',
-          status: 'rejected',
           rejection_reason: reason,
+          rejected_at: new Date().toISOString()
         })
         .eq('id', carId);
 
-      if (error) throw error;
+      if (rejectionError) throw rejectionError;
 
       // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: 'reject_car',
-        target_id: carId,
-        reason,
-      });
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          action_type: 'reject_car',
+          target_id: carId,
+          target_type: 'car',
+          admin_id: (await supabase.auth.getUser()).data.user?.id,
+          reason
+        });
 
+      if (actionError) throw actionError;
+
+      // Refresh pending cars
       await get().fetchPendingCars();
-      await get().fetchRecentActions();
       set({ loading: false });
     } catch (error) {
       set({ error: 'Failed to reject car', loading: false });
+      console.error('Error rejecting car:', error);
     }
   },
 
   flagCar: async (carId: string, reason: string) => {
     try {
       set({ loading: true, error: null });
-      
-      const { error } = await supabase
+
+      const { error: flagError } = await supabase
         .from('cars')
-        .update({ status: 'maintenance' })
+        .update({ 
+          is_flagged: true,
+          flag_reason: reason,
+          flagged_at: new Date().toISOString()
+        })
         .eq('id', carId);
 
-      if (error) throw error;
+      if (flagError) throw flagError;
 
       // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: 'flag_car',
-        target_id: carId,
-        reason,
-      });
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          action_type: 'flag_car',
+          target_id: carId,
+          target_type: 'car',
+          admin_id: (await supabase.auth.getUser()).data.user?.id,
+          reason
+        });
 
-      await get().fetchPendingCars();
-      await get().fetchRecentActions();
+      if (actionError) throw actionError;
+
       set({ loading: false });
     } catch (error) {
       set({ error: 'Failed to flag car', loading: false });
+      console.error('Error flagging car:', error);
     }
   },
 
   approveBooking: async (bookingId: string) => {
     try {
       set({ loading: true, error: null });
-      
-      const { error } = await supabase
+
+      const { error: approvalError } = await supabase
         .from('bookings')
-        .update({ status: 'confirmed' })
+        .update({ 
+          status: 'confirmed',
+          confirmed_at: new Date().toISOString()
+        })
         .eq('id', bookingId);
 
-      if (error) throw error;
+      if (approvalError) throw approvalError;
 
       // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: 'approve_booking',
-        target_id: bookingId,
-      });
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          action_type: 'approve_booking',
+          target_id: bookingId,
+          target_type: 'booking',
+          admin_id: (await supabase.auth.getUser()).data.user?.id
+        });
 
+      if (actionError) throw actionError;
+
+      // Refresh pending bookings
       await get().fetchPendingBookings();
-      await get().fetchRecentActions();
       set({ loading: false });
     } catch (error) {
       set({ error: 'Failed to approve booking', loading: false });
+      console.error('Error approving booking:', error);
     }
   },
 
   rejectBooking: async (bookingId: string, reason: string) => {
     try {
       set({ loading: true, error: null });
-      
-      const { error } = await supabase
+
+      const { error: rejectionError } = await supabase
         .from('bookings')
-        .update({ status: 'cancelled' })
+        .update({ 
+          status: 'rejected',
+          rejection_reason: reason,
+          rejected_at: new Date().toISOString()
+        })
         .eq('id', bookingId);
 
-      if (error) throw error;
+      if (rejectionError) throw rejectionError;
 
       // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: 'reject_booking',
-        target_id: bookingId,
-        reason,
-      });
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          action_type: 'reject_booking',
+          target_id: bookingId,
+          target_type: 'booking',
+          admin_id: (await supabase.auth.getUser()).data.user?.id,
+          reason
+        });
 
+      if (actionError) throw actionError;
+
+      // Refresh pending bookings
       await get().fetchPendingBookings();
-      await get().fetchRecentActions();
       set({ loading: false });
     } catch (error) {
       set({ error: 'Failed to reject booking', loading: false });
+      console.error('Error rejecting booking:', error);
     }
   },
 
   flagBooking: async (bookingId: string, reason: string) => {
     try {
       set({ loading: true, error: null });
-      
-      // Log admin action
-      await supabase.from('admin_actions').insert({
-        admin_id: (await supabase.auth.getUser()).data.user?.id,
-        action_type: 'flag_booking',
-        target_id: bookingId,
-        reason,
-      });
 
-      await get().fetchPendingBookings();
-      await get().fetchRecentActions();
+      const { error: flagError } = await supabase
+        .from('bookings')
+        .update({ 
+          is_flagged: true,
+          flag_reason: reason,
+          flagged_at: new Date().toISOString()
+        })
+        .eq('id', bookingId);
+
+      if (flagError) throw flagError;
+
+      // Log admin action
+      const { error: actionError } = await supabase
+        .from('admin_actions')
+        .insert({
+          action_type: 'flag_booking',
+          target_id: bookingId,
+          target_type: 'booking',
+          admin_id: (await supabase.auth.getUser()).data.user?.id,
+          reason
+        });
+
+      if (actionError) throw actionError;
+
       set({ loading: false });
     } catch (error) {
       set({ error: 'Failed to flag booking', loading: false });
+      console.error('Error flagging booking:', error);
     }
   },
 }));

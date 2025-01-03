@@ -1,16 +1,59 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useSupabaseClient } from '@supabase/auth-helpers-react';
+import { supabase } from '@/lib/supabase';
 
 interface ImageUploadProps {
-  onUpload: (urls: string[]) => void;
+  onUpload: (paths: string[]) => void;
   maxFiles?: number;
+  bucket?: string;
+  initialImages?: string[];
 }
 
-export function ImageUpload({ onUpload, maxFiles = 5 }: ImageUploadProps) {
+export function ImageUpload({ 
+  onUpload, 
+  maxFiles = 5, 
+  bucket = 'images',
+  initialImages = []
+}: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const supabase = useSupabaseClient();
+  const [images, setImages] = useState<string[]>(initialImages);
+  const [signedUrls, setSignedUrls] = useState<string[]>([]);
+
+  // Get signed URLs for images
+  const getSignedUrls = useCallback(async (urls: string[]) => {
+    try {
+      const signedUrlPromises = urls.map(async (url) => {
+        const path = url.split(`/public/${bucket}/`)[1];
+        if (!path) return url;
+
+        const { data } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(path, 60 * 60); // 1 hour expiry
+
+        return data?.signedUrl || url;
+      });
+
+      const newSignedUrls = await Promise.all(signedUrlPromises);
+      setSignedUrls(newSignedUrls);
+    } catch (error) {
+      console.error('Error getting signed URLs:', error);
+    }
+  }, [bucket]);
+
+  // Update signed URLs when images change
+  useEffect(() => {
+    if (images.length > 0) {
+      getSignedUrls(images);
+    }
+  }, [images, getSignedUrls]);
+
+  // Set initial images once on mount
+  useEffect(() => {
+    if (initialImages.length > 0) {
+      setImages(initialImages);
+    }
+  }, []);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > maxFiles) {
@@ -22,89 +65,117 @@ export function ImageUpload({ onUpload, maxFiles = 5 }: ImageUploadProps) {
     setError(null);
 
     try {
+      console.log('Starting upload for files:', acceptedFiles);
+      
       const uploadPromises = acceptedFiles.map(async (file) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
+        const uniqueId = Math.random().toString(36).substring(2);
+        const fileName = `${uniqueId}-${file.name}`;
         const filePath = `${fileName}`;
 
-        const { error: uploadError, data } = await supabase.storage
-          .from('car-images')
-          .upload(filePath, file);
+        console.log('Uploading file:', fileName);
+
+        // Upload the file
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from(bucket)
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
         if (uploadError) {
+          console.error('Upload error:', uploadError);
           throw uploadError;
         }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('car-images')
+        console.log('Upload successful:', uploadData);
+
+        // Get the public URL
+        const { data: urlData } = await supabase.storage
+          .from(bucket)
           .getPublicUrl(filePath);
 
-        return publicUrl;
+        return urlData?.publicUrl;
       });
 
-      const urls = await Promise.all(uploadPromises);
-      onUpload(urls);
+      const uploadedUrls = await Promise.all(uploadPromises);
+      const validUrls = uploadedUrls.filter((url): url is string => url !== undefined);
+      
+      if (validUrls.length > 0) {
+        setImages(validUrls);
+        onUpload(validUrls);
+      }
     } catch (error) {
-      setError('Error uploading images');
-      console.error('Error uploading images:', error);
+      console.error('Error uploading files:', error);
+      setError('Error uploading files. Please try again.');
     } finally {
       setUploading(false);
     }
-  }, [maxFiles, onUpload, supabase.storage]);
+  }, [maxFiles, bucket, onUpload]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.webp']
-    },
     maxFiles,
+    accept: {
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif']
+    }
   });
 
   return (
-    <div className="w-full">
+    <div>
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-          ${isDragActive ? 'border-primary bg-primary/10' : 'border-gray-300 hover:border-primary'}
-          ${error ? 'border-red-500' : ''}`}
+        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+          isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+        }`}
       >
         <input {...getInputProps()} />
         {uploading ? (
-          <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <p className="mt-2 text-sm text-gray-600">Uploading...</p>
-          </div>
-        ) : isDragActive ? (
-          <p className="text-sm text-gray-600">Drop the files here...</p>
+          <p>Uploading...</p>
         ) : (
-          <div className="space-y-2">
-            <div className="flex justify-center">
-              <svg
-                className="h-12 w-12 text-gray-400"
-                stroke="currentColor"
-                fill="none"
-                viewBox="0 0 48 48"
-                aria-hidden="true"
-              >
-                <path
-                  d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
+          <div>
             <p className="text-sm text-gray-600">
-              Drag and drop images here, or click to select
+              {isDragActive
+                ? 'Drop the files here...'
+                : `Drag 'n' drop images here, or click to select files`}
             </p>
-            <p className="text-xs text-gray-500">
-              Maximum {maxFiles} images. JPEG, PNG, WebP up to 10MB each
+            <p className="text-xs text-gray-500 mt-1">
+              Maximum {maxFiles} {maxFiles === 1 ? 'file' : 'files'}
             </p>
           </div>
         )}
       </div>
+
       {error && (
         <p className="mt-2 text-sm text-red-600">{error}</p>
+      )}
+
+      {images.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-4">
+          {images.map((url, index) => (
+            <div key={url} className="relative aspect-video group">
+              <img
+                src={signedUrls[index] || url}
+                alt={`Uploaded ${index + 1}`}
+                className="w-full h-full object-cover rounded-lg"
+              />
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const newImages = images.filter((_, i) => i !== index);
+                  setImages(newImages);
+                  onUpload(newImages);
+                }}
+                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-red-600"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

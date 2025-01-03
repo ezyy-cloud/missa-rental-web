@@ -1,62 +1,44 @@
+import type { Car } from './car';
+
+export type { Car, CarType, CarStatus } from './car';
+export { CAR_TYPES, CAR_STATUS } from './car';
+
 export interface Profile {
   id: string;
-  created_at: string;
-  updated_at: string;
-  full_name: string | null;
+  user_id: string;
   email: string | null;
+  full_name: string | null;
   avatar_url: string | null;
   phone: string | null;
-  bio: string | null;
-  address: string | null;
-  preferred_contact: 'email' | 'phone' | 'both' | null;
-  verification_status: 'pending' | 'verified' | 'rejected' | null;
-  id_type: 'passport' | 'national_id' | 'drivers_license' | null;
-  id_number: string | null;
-  id_expiry_date: string | null;
-  id_country: string | null;
-  drivers_license_number: string | null;
-  drivers_license_expiry: string | null;
-  drivers_license_country: string | null;
-  emergency_contact_name: string | null;
-  emergency_contact_phone: string | null;
-  emergency_contact_relationship: string | null;
-  is_owner: boolean;
-  stripe_customer_id: string | null;
-  stripe_account_id: string | null;
-  role: 'user' | 'admin' | null;
-  last_login: string | null;
-  is_suspended: boolean;
-}
-
-export interface Car {
-  id: string;
-  owner_id: string;
-  name: string;
-  description: string | null;
-  image: string | null;
-  price: number;
-  location: string;
-  make: string;
-  model: string;
-  year: number;
-  color: string;
-  transmission: 'automatic' | 'manual';
-  fuel_type: 'petrol' | 'diesel' | 'electric' | 'hybrid';
-  seats: number;
-  mileage: number;
-  features: string[];
-  availability_start: string;
-  availability_end: string;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+  country: string | null;
   created_at: string;
   updated_at: string;
-  average_rating: number;
-  total_reviews: number;
-  status: 'available' | 'unavailable' | 'maintenance' | 'pending_approval' | 'rejected';
-  approval_status: 'pending' | 'approved' | 'rejected';
-  rejection_reason: string | null;
-  inspection_date: string | null;
-  insurance_expiry: string | null;
-  owner?: Profile;
+  verified_at: string | null;
+  suspended_at: string | null;
+}
+
+export interface Review {
+  id: string;
+  car_id: string;
+  reviewer_id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  updated_at: string;
+  reviewer?: Profile;
+  car?: Car;
+}
+
+export interface FavoriteCar {
+  user_id: string;
+  car_id: string;
+  created_at: string;
+  car?: Car;
 }
 
 export interface Booking {
@@ -73,22 +55,6 @@ export interface Booking {
   renter?: Profile;
   reviews?: Review[];
   messages?: Message[];
-}
-
-export interface Review {
-  id: string;
-  booking_id: string;
-  reviewer_id: string;
-  reviewee_id: string;
-  car_id: string | null;
-  rating: number;
-  comment: string | null;
-  review_type: 'car' | 'renter' | 'owner';
-  created_at: string;
-  reviewer?: Profile;
-  reviewee?: Profile;
-  car?: Car;
-  booking?: Booking;
 }
 
 export interface Message {
@@ -113,13 +79,6 @@ export interface Notification {
   read: boolean;
   data: Record<string, any> | null;
   created_at: string;
-}
-
-export interface FavoriteCar {
-  user_id: string;
-  car_id: string;
-  created_at: string;
-  car?: Car;
 }
 
 export interface AdminStats {

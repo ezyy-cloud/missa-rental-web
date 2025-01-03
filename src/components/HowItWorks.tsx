@@ -26,7 +26,7 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <section className="py-16 bg-white dark:bg-gray-900">
+    <section className="py-16 bg-white dark:bg-black border-t border-gray-200 dark:border-white/10">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
@@ -39,7 +39,7 @@ export default function HowItWorks() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {steps.map((step, index) => (
-            <div key={index} className="text-center p-6 rounded-lg bg-gray-50 dark:bg-gray-800">
+            <div key={index} className="text-center p-6 rounded-lg bg-gray-50 dark:bg-dark-lighter">
               <div className="w-16 h-16 mx-auto bg-primary/10 dark:bg-primary/20 rounded-full flex items-center justify-center mb-4">
                 <step.icon className="w-8 h-8 text-primary" />
               </div>

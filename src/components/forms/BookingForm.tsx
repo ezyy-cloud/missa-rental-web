@@ -36,7 +36,7 @@ export function BookingForm({ car }: BookingFormProps) {
     e.preventDefault();
     
     if (!user) {
-      navigate('/signin', { state: { from: `/cars/${car.id}` } });
+      navigate('/sign-in', { state: { from: `/cars/${car.id}` } });
       return;
     }
 
@@ -64,72 +64,75 @@ export function BookingForm({ car }: BookingFormProps) {
         calculateTotalPrice()
       );
 
-      // Redirect to profile page
-      navigate('/profile', { 
-        state: { message: 'Booking created successfully!' }
-      });
+      navigate('/bookings');
     } catch (err) {
-      setError('Failed to create booking. Please try again.');
+      setError('Failed to create booking');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
-          {error}
+    <form onSubmit={handleSubmit} className="bg-white dark:bg-black rounded-lg shadow-lg p-6">
+      <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Book this car</h2>
+      
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="startDate" className="block text-sm font-medium text-gray-900 dark:text-white">
+            Start Date
+          </label>
+          <Input
+            id="startDate"
+            type="date"
+            value={dates.startDate}
+            onChange={(e) => setDates(prev => ({ ...prev, startDate: e.target.value }))}
+            min={new Date().toISOString().split('T')[0]}
+            required
+            className="mt-1"
+          />
         </div>
-      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Input
-          type="date"
-          label="Start Date"
-          value={dates.startDate}
-          onChange={(e) => setDates(prev => ({ ...prev, startDate: e.target.value }))}
-          min={new Date().toISOString().split('T')[0]}
-          required
-        />
-        <Input
-          type="date"
-          label="End Date"
-          value={dates.endDate}
-          onChange={(e) => setDates(prev => ({ ...prev, endDate: e.target.value }))}
-          min={dates.startDate || new Date().toISOString().split('T')[0]}
-          required
-        />
+        <div>
+          <label htmlFor="endDate" className="block text-sm font-medium text-gray-900 dark:text-white">
+            End Date
+          </label>
+          <Input
+            id="endDate"
+            type="date"
+            value={dates.endDate}
+            onChange={(e) => setDates(prev => ({ ...prev, endDate: e.target.value }))}
+            min={dates.startDate || new Date().toISOString().split('T')[0]}
+            required
+            className="mt-1"
+          />
+        </div>
+
+        {calculateNumberOfDays() > 0 && (
+          <div className="mt-4">
+            <p className="text-gray-900 dark:text-white">
+              Duration: {calculateNumberOfDays()} days
+            </p>
+            <p className="text-xl font-bold text-gray-900 dark:text-white">
+              Total: ${calculateTotalPrice()}
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="text-red-500 mt-2">
+            {error}
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={loading}
+          className="w-full text-black hover:text-black"
+        >
+          {loading ? 'Processing...' : 'Book Now'}
+        </Button>
       </div>
-
-      <div className="border-t pt-4">
-        <div className="flex justify-between mb-2">
-          <span>Price per day</span>
-          <span>${car.price}</span>
-        </div>
-        <div className="flex justify-between mb-2">
-          <span>Number of days</span>
-          <span>{calculateNumberOfDays()}</span>
-        </div>
-        <div className="flex justify-between font-bold">
-          <span>Total</span>
-          <span>${calculateTotalPrice()}</span>
-        </div>
-      </div>
-
-      <Button 
-        type="submit" 
-        disabled={loading}
-        className="w-full"
-      >
-        {loading ? 'Processing...' : 'Book Now'}
-      </Button>
-
-      {!user && (
-        <p className="text-sm text-gray-600 text-center">
-          Please sign in to book this car
-        </p>
-      )}
     </form>
   );
 }

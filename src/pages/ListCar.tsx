@@ -1,8 +1,22 @@
 import { Helmet } from 'react-helmet-async';
 import { Trophy } from 'lucide-react';
 import { ListCarForm } from '../components/forms/ListCarForm';
+import { createCar } from '../lib/cars';
+import { useNavigate } from 'react-router-dom';
+import type { Car } from '../types/car';
 
 export default function ListCarPage() {
+  const navigate = useNavigate();
+
+  const handleSubmit = async (data: Partial<Car>) => {
+    try {
+      const car = await createCar(data as Omit<Car, 'id' | 'owner_id'>);
+      navigate(`/cars/${car.id}`);
+    } catch (error) {
+      console.error('Error creating car:', error);
+    }
+  };
+
   return (
     <>
       <Helmet>
@@ -13,7 +27,7 @@ export default function ListCarPage() {
         />
       </Helmet>
 
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+      <div className="min-h-screen bg-gray-50 dark:bg-black py-12">
         <div className="max-w-3xl mx-auto px-4">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
@@ -24,7 +38,7 @@ export default function ListCarPage() {
             </p>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+          <div className="bg-white dark:bg-dark-lighter rounded-lg shadow-md p-6 mb-8">
             <div className="flex items-start gap-4 p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg mb-6">
               <Trophy className="w-6 h-6 text-blue-500 flex-shrink-0 mt-1" />
               <div>
@@ -37,7 +51,7 @@ export default function ListCarPage() {
               </div>
             </div>
 
-            <ListCarForm />
+            <ListCarForm onSubmit={handleSubmit} />
           </div>
         </div>
       </div>

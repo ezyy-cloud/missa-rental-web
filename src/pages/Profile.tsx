@@ -1,63 +1,101 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '../stores/authStore';
-import { useProfileStore } from '../stores/profileStore';
-import { useBookingStore } from '../stores/bookingStore';
-import { useCarStore } from '../stores/carStore';
-import { useReviewStore } from '../stores/reviewStore';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/Tabs';
-import ProfileForm from '../components/profile/ProfileForm';
-import IdentityVerification from '../components/profile/IdentityVerification';
-import PaymentMethods from '../components/profile/PaymentMethods';
-import BookingsList from '../components/profile/BookingsList';
-import ListedCars from '../components/profile/ListedCars';
-import { Star, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth';
+import { useCarStore } from '@/stores/carStore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs';
+import ProfileForm from '@/components/profile/ProfileForm';
+import IdentityVerification from '@/components/profile/IdentityVerification';
+import PaymentMethods from '@/components/profile/PaymentMethods';
+import BookingsList from '@/components/profile/BookingsList';
+import ListedCars from '@/components/profile/ListedCars';
+import { AlertCircle, Star, MessageCircle } from 'lucide-react';
+
+interface FormData {
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  phone: string;
+  address_line1: string;
+  address_line2: string;
+  city: string;
+  state: string;
+  country: string;
+  postal_code: string;
+}
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, initialized } = useAuthStore();
-  const { profile, fetchProfile, updateProfile } = useProfileStore();
-  const { bookings, fetchBookings } = useBookingStore();
+  const { user, profile, loading, initialized, updateProfile } = useAuthStore();
   const { userCars, fetchUserCars } = useCarStore();
-  const { reviews, fetchReviews } = useReviewStore();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
+    email: '',
     full_name: '',
-    phone: '',
     avatar_url: '',
-    bio: '',
-    address: '',
-    preferred_contact: 'email'
+    phone: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    state: '',
+    country: '',
+    postal_code: ''
   });
 
   useEffect(() => {
     if (initialized && !user) {
-      navigate('/signin');
+      navigate('/sign-in');
       return;
     }
+  }, [user, initialized, navigate]);
 
+  useEffect(() => {
     if (user) {
-      fetchProfile();
-      fetchBookings();
       fetchUserCars();
-      fetchReviews('user', user.id);
     }
-  }, [user, initialized, navigate, fetchProfile, fetchBookings, fetchUserCars, fetchReviews]);
+  }, [user, fetchUserCars]);
 
   useEffect(() => {
     if (profile) {
       setFormData({
+        email: profile.email || '',
         full_name: profile.full_name || '',
-        phone: profile.phone || '',
         avatar_url: profile.avatar_url || '',
-        bio: profile.bio || '',
-        address: profile.address || '',
-        preferred_contact: profile.preferred_contact || 'email'
+        phone: profile.phone || '',
+        address_line1: profile.address_line1 || '',
+        address_line2: profile.address_line2 || '',
+        city: profile.city || '',
+        state: profile.state || '',
+        country: profile.country || '',
+        postal_code: profile.postal_code || ''
       });
     }
   }, [profile]);
 
-  if (!initialized) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      console.log('Form data before submission:', formData);
+      const updateData = {
+        email: formData.email || null,
+        full_name: formData.full_name || null,
+        avatar_url: formData.avatar_url || null,
+        phone: formData.phone || null,
+        address_line1: formData.address_line1 || null,
+        address_line2: formData.address_line2 || null,
+        city: formData.city || null,
+        state: formData.state || null,
+        country: formData.country || null,
+        postal_code: formData.postal_code || null
+      };
+      console.log('Update data:', updateData);
+      await updateProfile(updateData);
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
+  };
+
+  if (!initialized || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center dark:bg-gray-900">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -65,19 +103,9 @@ export default function ProfilePage() {
     );
   }
 
-  if (!user) {
+  if (!user || !profile) {
     return null;
   }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await updateProfile(formData);
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Error updating profile:', error);
-    }
-  };
 
   const needsVerification = !profile?.id_number || profile.verification_status === 'pending';
 
@@ -101,87 +129,101 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
-        
-        <Tabs defaultValue={needsVerification ? "verification" : "profile"} className="space-y-8">
-          <TabsList className="bg-white dark:bg-gray-800 p-1 rounded-lg">
-            <TabsTrigger value="profile" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-700">
+
+        <Tabs defaultValue="profile" className="space-y-4">
+          <TabsList className="bg-white dark:bg-gray-800 p-1 rounded-lg border dark:border-gray-700">
+            <TabsTrigger value="profile" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700 dark:text-gray-300">
               Profile
             </TabsTrigger>
-            <TabsTrigger value="verification" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-700">
+            <TabsTrigger value="verification" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700 dark:text-gray-300">
               Verification
             </TabsTrigger>
-            <TabsTrigger value="payment" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-700">
-              Payment
-            </TabsTrigger>
-            <TabsTrigger value="bookings" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-700">
+            <TabsTrigger value="bookings" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700 dark:text-gray-300">
               Bookings
             </TabsTrigger>
-            <TabsTrigger value="cars" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-700">
+            <TabsTrigger value="cars" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700 dark:text-gray-300">
               My Cars
             </TabsTrigger>
-            <TabsTrigger value="reviews" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-700">
+            <TabsTrigger value="payments" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700 dark:text-gray-300">
+              Payments
+            </TabsTrigger>
+            <TabsTrigger value="reviews" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700 dark:text-gray-300">
               Reviews
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-700 dark:text-gray-300">
+              Messages
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="profile" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            <ProfileForm 
-              profile={profile} 
-              isEditing={isEditing} 
-              setIsEditing={setIsEditing} 
-              formData={formData} 
-              setFormData={setFormData} 
-              handleSubmit={handleSubmit} 
+          <TabsContent value="profile" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <ProfileForm
+              profile={profile}
+              isEditing={isEditing}
+              setIsEditing={setIsEditing}
+              formData={formData}
+              setFormData={setFormData}
+              handleSubmit={handleSubmit}
             />
           </TabsContent>
 
-          <TabsContent value="verification" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-            <IdentityVerification
-              onComplete={() => fetchProfile()}
-            />
+          <TabsContent value="verification" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <IdentityVerification onComplete={() => {}} />
           </TabsContent>
 
-          <TabsContent value="payment" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <PaymentMethods />
+          <TabsContent value="bookings" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <BookingsList bookings={[]} />
           </TabsContent>
 
-          <TabsContent value="bookings" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <BookingsList bookings={bookings} />
-          </TabsContent>
-
-          <TabsContent value="cars" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <TabsContent value="cars" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <ListedCars userCars={userCars} />
           </TabsContent>
 
-          <TabsContent value="reviews" className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+          <TabsContent value="payments" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <PaymentMethods />
+          </TabsContent>
+
+          <TabsContent value="reviews" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold mb-4 dark:text-white">Reviews</h2>
-              {reviews.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400">No reviews yet</p>
-              ) : (
-                <div className="grid gap-4">
-                  {reviews.map((review) => (
-                    <div key={review.id} className="border dark:border-gray-700 rounded-lg p-4">
-                      <div className="flex items-center mb-2">
-                        <div className="flex items-center text-yellow-400">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-5 h-5 ${
-                                i < review.rating ? 'fill-current' : 'fill-none'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(review.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <p className="text-gray-700 dark:text-gray-300">{review.comment}</p>
-                    </div>
-                  ))}
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Reviews</h2>
+                <div className="flex items-center space-x-2">
+                  <Star className="w-5 h-5 text-yellow-400" />
+                  <span className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {profile.average_rating?.toFixed(1) || '0.0'}
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    ({profile.total_reviews || 0} reviews)
+                  </span>
                 </div>
-              )}
+              </div>
+
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {/* TODO: Add reviews list */}
+                <div className="py-4 text-gray-500 dark:text-gray-400">
+                  No reviews yet
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="messages" className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Messages</h2>
+                <div className="flex items-center space-x-2">
+                  <MessageCircle className="w-5 h-5 text-primary" />
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    0 unread
+                  </span>
+                </div>
+              </div>
+
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {/* TODO: Add messages list */}
+                <div className="py-4 text-gray-500 dark:text-gray-400">
+                  No messages yet
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
